@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"net/url"
 	"regexp"
@@ -77,7 +76,7 @@ func GetPlaybackURL(link string, results chan<- ChannelMessage) {
 	resp, err := http.Get(link)
 	defer resp.Body.Close()
 	if err != nil {
-		results <- ChannelMessage{err: err, link: link}
+		results <- ChannelMessage{err: err}
 		return
 	} else if resp.StatusCode != http.StatusOK {
 		results <- ChannelMessage{err: errors.New(resp.Status), link: link}
@@ -107,8 +106,8 @@ func GetPlaybackURL(link string, results chan<- ChannelMessage) {
 			results <- ChannelMessage{err: err, link: link}
 			return
 		}
-		// At his point we may or may not find a stream URl in the next places:
-		// 	- ytInitialPlayerResponse.streamingData.adaptiveFormats (skip it for now)
+		// At his point we may or may not find a stream URl in next places:
+		// 	- ytInitialPlayerResponse.streamingData.adaptiveFormats (TODO: implement me)
 		// 	- ytInitialPlayerResponse.streamingData.formats
 		// If `url` key exists then we can use it, but there is a high chance that it's not there,
 		// in this case it means that this video is extra protected, for such cases we need another approach for getting
@@ -126,7 +125,7 @@ func GetPlaybackURL(link string, results chan<- ChannelMessage) {
 		//  - Download the DASH manifest and extract additional streams.
 		//  - Use itag to classify streams by their properties.
 		//  - Choose a stream and download it in segments.(see another further in the code).
-		// To handle this case youtube dl lib will be used (see further in the code).
+		//  To handle this case youtube-dl lib will be used (see further in the code).
 		formats := playerResponseData["streamingData"].(map[string]any)["formats"].([]any)
 		for _, v := range formats {
 			// Ensure we have all keys we need.
@@ -154,7 +153,10 @@ func GetPlaybackURL(link string, results chan<- ChannelMessage) {
 		// At this point if we have a stream URL we are fine, and we can use it.
 		// If not, we'll use YouTube dl lib to get the stream url of protected videos/channels.
 		if streamURL != "" {
-			results <- ChannelMessage{result: streamURL, link: link}
+			results <- ChannelMessage{
+				result: Video{streamUrl: streamURL, url: link},
+				link:   link,
+			}
 			return
 		}
 	}
@@ -173,7 +175,10 @@ func GetPlaybackURL(link string, results chan<- ChannelMessage) {
 				return
 			}
 			streamURL = _streamURL
-			results <- ChannelMessage{result: streamURL, link: link}
+			results <- ChannelMessage{
+				result: Video{streamUrl: streamURL, url: link},
+				link:   link,
+			}
 			return
 		}
 	}
@@ -183,59 +188,10 @@ func GetPlaybackURL(link string, results chan<- ChannelMessage) {
 	}
 }
 
-func DownloadVideo(playbackLink string) {
+func FetchMetadata(link string) {
 
 }
 
-func download() {
-	link := "https://www.youtube.com/watch?v=hS5CfP8n_js"
-	//id := "hS5CfP8n_js"
+func DownloadVideo(streamURL string) {
 
-	// Get metadata.
-	log.Printf("Making a request.. \"%v\"", link)
-	//metaURL := "https://www.youtube.com/get_video_info?video_id=" + id
-	resp, err := http.Get(link)
-	defer resp.Body.Close()
-
-	if err != nil {
-		log.Printf("Error %s", err)
-		return
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		log.Printf("All bad. Status %s", resp.StatusCode)
-		return
-	}
-
-	body, err := io.ReadAll(resp.Body)
-	var bodyText = string(body)
-
-	//r, _ := regexp.Compile("var ytInitialPlayerResponse")
-	//fmt.Println(
-	//	r.FindStringIndex(string(body)),
-	//)
-	r, _ := regexp.Compile("ytInitialPlayerResponse\\s*=\\s*(\\{.+?\\})\\s*;")
-
-	var playerResponseData map[string]any
-	var jsonString string
-
-	if idx := r.FindStringIndex(bodyText); len(idx) != 0 {
-		jsonString = bodyText[idx[0]+len("ytInitialPlayerResponse = ") : idx[1]-1]
-		//fmt.Printf("%v", jsonString)
-		err = json.Unmarshal(
-			[]byte(jsonString),
-			&playerResponseData,
-		)
-		if err != nil {
-			log.Printf("Error %s", err)
-			return
-		}
-	}
-
-	formats := playerResponseData["streamingData"].(map[string]any)["formats"].([]any)
-	//fmt.Printf("%T %v\n\n", formats, formats)
-	for _, v := range formats {
-		fmt.Printf("%v\n\n", v.(map[string]any)["url"])
-		fmt.Printf("%v\n\n", v.(map[string]any)["qualityLabel"])
-	}
 }

@@ -29,12 +29,14 @@ var rootCmd = &cobra.Command{
 			errs := handleLinks(links)
 			// Stdout errors and exit.
 			if len(errs) > 0 {
-				cmd.Println("The following issues occurred during execution:")
+				cmd.Printf("\nThe following issues occurred during execution:\n")
 				for _, err := range errs {
 					cmd.Printf(" - %v\n", err)
 				}
-				cmd.Println("Address errors and retry.")
-				cmd.Println("You can also send a pull request https://github.com/ride90/youtube-to-mp3 :)")
+				cmd.Printf(
+					"\nAddress errors and retry." +
+						"\nYou can also send a pull request https://github.com/ride90/youtube-to-mp3 :)\n\n",
+				)
 				os.Exit(1)
 			}
 		}
@@ -53,15 +55,16 @@ func handleLinks(links []string) []error {
 	}
 	// Get playback stream URLs.
 	numberCount := len(links)
-	resultsChanel := make(chan video.ChannelMessage, numberCount)
+	channelGetPlaybackURL := make(chan video.ChannelMessage, numberCount)
 	for _, link := range links {
-		go video.GetPlaybackURL(link, resultsChanel)
+		go video.GetPlaybackURL(link, channelGetPlaybackURL)
 	}
 	for a := 1; a <= numberCount; a++ {
-		fmt.Println(<-resultsChanel)
-		fmt.Printf("\n\n\n")
+		fmt.Println(<-channelGetPlaybackURL)
+		fmt.Printf("\n\n")
 	}
-	close(resultsChanel)
+	close(channelGetPlaybackURL)
+
 	return nil
 }
 

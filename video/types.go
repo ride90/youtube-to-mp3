@@ -4,16 +4,16 @@ import "fmt"
 
 // ChannelMessage used to communicate between a main thread and goroutines.
 type ChannelMessage struct {
-	link   string
-	result string
+	result Video
 	err    error
+	link   string
 }
 
 func (msg ChannelMessage) String() string {
-	if msg.result != "" {
-		return fmt.Sprintf("Link: %v Result: %v Error: %v", msg.link, msg.result, msg.err)
+	if msg.err != nil {
+		return fmt.Sprintf("result=%v err=%v", msg.result, msg.err)
 	}
-	return fmt.Sprintf("Link: %v Error: %v", msg.link, msg.err)
+	return fmt.Sprintf("Result: %#v", msg.result)
 }
 
 type ErrorBadLink struct {
@@ -22,7 +22,7 @@ type ErrorBadLink struct {
 }
 
 func (e *ErrorBadLink) Error() string {
-	return fmt.Sprintf("link \"%v\" has an issue: %v", e.link, e.message)
+	return fmt.Sprintf("Link %q %v", e.link, e.message)
 }
 
 type ErrorGetPlaybackURL struct {
@@ -31,5 +31,16 @@ type ErrorGetPlaybackURL struct {
 }
 
 func (e *ErrorGetPlaybackURL) Error() string {
-	return fmt.Sprintf("Failed to get a stream URL for the link \"%v\" reason: \"%v\"", e.link, e.message)
+	return fmt.Sprintf("Failed to get a stream URL for the link %q reason: %q", e.link, e.message)
+}
+
+type Video struct {
+	url       string
+	streamUrl string
+	name      string
+}
+
+func (v Video) String() string {
+	hasStream := v.streamUrl != ""
+	return fmt.Sprintf("name=%q url=%q hasStream=%v", v.name, v.url, hasStream)
 }
