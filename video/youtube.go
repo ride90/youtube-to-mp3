@@ -10,38 +10,14 @@ import (
 	"net/url"
 	"regexp"
 	"strings"
+
+	"github.com/kkdai/youtube/v2"
 )
 
-type ChannelMessage struct {
-	link   string
-	result string
-	err    error
-}
-
-func (msg ChannelMessage) String() string {
-	if msg.result != "" {
-		return fmt.Sprintf("Link: %v Result: %v Error: %v", msg.link, msg.result, msg.err)
-	}
-	return fmt.Sprintf("Link: %v Error: %v", msg.link, msg.err)
-}
-
-type errorBadLink struct {
-	link    string
-	message string
-}
-
-func (e *errorBadLink) Error() string {
-	return fmt.Sprintf("link \"%v\" has an issue: %v", e.link, e.message)
-}
-
-type errorGetPlaybackURL struct {
-	link    string
-	message string
-}
-
-func (e *errorGetPlaybackURL) Error() string {
-	return fmt.Sprintf("Failed to get a stream URL for link \"%v\" with an issue: \"%v\"", e.link, e.message)
-}
+const audioQualityMedium string = "AUDIO_QUALITY_MEDIUM"
+const videoQualityHigh string = "hd720"
+const videoQualityMedium string = "medium"
+const videoQualityTiny string = "tiny"
 
 // ValidateLinks Ensures:
 // - links are valid parseable URLs
@@ -58,7 +34,7 @@ func ValidateLinks(links []string) []error {
 		if err != nil {
 			errors = append(
 				errors,
-				&errorBadLink{link, fmt.Sprintf("%v", err)},
+				&ErrorBadLink{link, fmt.Sprintf("%v", err)},
 			)
 		}
 		// Check if link is a YouTube link.
@@ -71,7 +47,7 @@ func ValidateLinks(links []string) []error {
 		if !strings.HasPrefix(link, prefixShort) && !strings.HasPrefix(link, prefixLong) {
 			errors = append(
 				errors,
-				&errorBadLink{
+				&ErrorBadLink{
 					link,
 					fmt.Sprintf(
 						"not a YouTube video link. Expected formats: \"%v/<video_id>\" or \"%v?v=<video_id>\"",
@@ -86,6 +62,8 @@ func ValidateLinks(links []string) []error {
 }
 
 func GetPlaybackURL(link string, results chan<- ChannelMessage) {
+	var streamURL string
+	
 	// Remove all query params except `v`.
 	_url, _ := url.ParseRequestURI(link)
 	query, _ := url.ParseQuery(_url.RawQuery)
@@ -150,36 +128,60 @@ func GetPlaybackURL(link string, results chan<- ChannelMessage) {
 		//  - Use itag to classify streams by their properties.
 		//  - Choose a stream and download it in segments.(see another further in the code).
 		// To handle this case youtube dl lib will be used (see further in the code).
-		var streamURL string
 		formats := playerResponseData["streamingData"].(map[string]any)["formats"].([]any)
 		for _, v := range formats {
 			// Ensure we have all keys we need.
-			var hasQualityLabel bool = v.(map[string]any)["qualityLabel"] != nil
+			var hasQuality bool = v.(map[string]any)["quality"] != nil
 			var hasURL bool = v.(map[string]any)["url"] != nil
-			var hasMimeType bool = v.(map[string]any)["mimeType"] != nil
-			if !hasQualityLabel || !hasURL || !hasMimeType {
+			var hasAudioQuality bool = v.(map[string]any)["audioQuality"] != nil
+			if !hasQuality || !hasURL || !hasAudioQuality {
 				continue
 			}
 			// Try to get strings from underlying value.
-			quality, okQuality := v.(map[string]any)["qualityLabel"].(string)
-			mimetype, okMimetype := v.(map[string]any)["mimeType"].(string)
+			quality, okQuality := v.(map[string]any)["quality"].(string)
+			audioQuality, okAudioQuality := v.(map[string]any)["audioQuality"].(string)
 			_streamURL, okStreamURL := v.(map[string]any)["url"].(string)
-			if !okQuality || !okMimetype || !okStreamURL {
+			if !okQuality || !okAudioQuality || !okStreamURL {
 				continue
 			}
-			if (quality == "360p" || quality == "240p") && strings.HasPrefix(mimetype, "video/mp4") {
+			// Get only tiny/medium/hd with a medium audio quality.
+			// No need for an explicit sorting (at least for now) since tiny goes first in the response array.
+			isQuality := quality == videoQualityTiny || quality == videoQualityMedium || quality == videoQualityHigh
+			if isQuality && audioQuality == audioQualityMedium {
 				streamURL = _streamURL
 				break
 			}
 		}
 		// At this point if we have a stream URL we are fine, and we can use it.
-		// If not, we'll use youtube dl lib to get the stream url of protected videos/channels.
+		// If not, we'll use YouTube dl lib to get the stream url of protected videos/channels.
 		if streamURL != "" {
 			results <- ChannelMessage{result: streamURL, link: link}
 			return
 		}
 	}
-	results <- ChannelMessage{link: link}
+	// Try to get video stream using a youtube-dl library (ported from python).
+	client := youtube.Client{}
+	video, err := client.GetVideo(link)
+	formats := video.Formats.WithAudioChannels()
+	// Loop through formats until we find the one which fits our needs: lightest video (if possible), medium audio.
+	for _, format := range formats {
+		isQuality := format.Quality == videoQualityTiny || format.Quality == videoQualityMedium || format.Quality == videoQualityHigh
+		if isQuality && format.AudioQuality == audioQualityMedium {
+			// Magic happens here and we get our video stream URL.
+			_streamURL, err := client.GetStreamURL(video, &format)
+			if err != nil {
+				results <- ChannelMessage{err: err, link: link}
+				return
+			}
+			streamURL = _streamURL
+			results <- ChannelMessage{result: streamURL, link: link}
+			return
+		}
+	}
+	results <- ChannelMessage{
+		link: link,
+		err:  &ErrorGetPlaybackURL{link: link, message: "desired video stream was not found"},
+	}
 }
 
 func DownloadVideo(playbackLink string) {

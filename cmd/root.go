@@ -52,7 +52,6 @@ func handleLinks(links []string) []error {
 	if len(errs) > 0 {
 		return errs
 	}
-
 	// Get playback stream URLs.
 	numberCount := len(links)
 	resultsChanel := make(chan video.ChannelMessage, numberCount)
@@ -61,6 +60,7 @@ func handleLinks(links []string) []error {
 	}
 	for a := 1; a <= numberCount; a++ {
 		fmt.Println(<-resultsChanel)
+		fmt.Printf("\n\n\n")
 	}
 	close(resultsChanel)
 
