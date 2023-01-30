@@ -25,15 +25,15 @@ const videoQualityTiny string = "tiny"
 func ValidateLinks(links []string) []error {
 	const prefixLong string = "https://www.youtube.com/"
 	const prefixShort string = "https://youtu.be/"
-	var errors []error
+	var _errors []error
 
 	// Validate links. If at least one link is not valid we stop an execution.
 	for _, link := range links {
 		// Check if link is parseable.
 		_, err := url.ParseRequestURI(link)
 		if err != nil {
-			errors = append(
-				errors,
+			_errors = append(
+				_errors,
 				&ErrorBadLink{link, fmt.Sprintf("%v", err)},
 			)
 		}
@@ -45,8 +45,8 @@ func ValidateLinks(links []string) []error {
 		// TODO: In the future query args can be used to cut video.
 		// 	Might be handy if you want to extract audio using a specific range.
 		if !strings.HasPrefix(link, prefixShort) && !strings.HasPrefix(link, prefixLong) {
-			errors = append(
-				errors,
+			_errors = append(
+				_errors,
 				&ErrorBadLink{
 					link,
 					fmt.Sprintf(
@@ -57,13 +57,12 @@ func ValidateLinks(links []string) []error {
 			)
 		}
 	}
-
-	return errors
+	return _errors
 }
 
 func GetPlaybackURL(link string, results chan<- ChannelMessage) {
 	var streamURL string
-	
+
 	// Remove all query params except `v`.
 	_url, _ := url.ParseRequestURI(link)
 	query, _ := url.ParseQuery(_url.RawQuery)
@@ -239,5 +238,4 @@ func download() {
 		fmt.Printf("%v\n\n", v.(map[string]any)["url"])
 		fmt.Printf("%v\n\n", v.(map[string]any)["qualityLabel"])
 	}
-
 }

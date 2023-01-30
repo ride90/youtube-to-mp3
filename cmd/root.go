@@ -47,7 +47,6 @@ var rootCmd = &cobra.Command{
 
 func handleLinks(links []string) []error {
 	// Validate links. If at least one link is not valid we stop an execution.
-	// TODO: Uncomment me when time has come.
 	errs := video.ValidateLinks(links)
 	if len(errs) > 0 {
 		return errs
@@ -63,13 +62,11 @@ func handleLinks(links []string) []error {
 		fmt.Printf("\n\n\n")
 	}
 	close(resultsChanel)
-
 	return nil
 }
 
 func handleNames(names []string) {
-	fmt.Println(names)
-	fmt.Println("Not implemented handleNames")
+	panic("handleNames is not implemented")
 }
 
 // Execute This is called by main.main().
