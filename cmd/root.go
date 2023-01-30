@@ -46,10 +46,23 @@ var rootCmd = &cobra.Command{
 }
 
 func handleLinks(links []string) []error {
+	// Validate links. If at least one link is not valid we stop an execution.
+	// TODO: Uncomment me when time has come.
 	errs := video.ValidateLinks(links)
 	if len(errs) > 0 {
 		return errs
 	}
+
+	// Get playback stream URLs.
+	numberCount := len(links)
+	resultsChanel := make(chan video.ChannelMessage, numberCount)
+	for _, link := range links {
+		go video.GetPlaybackURL(link, resultsChanel)
+	}
+	for a := 1; a <= numberCount; a++ {
+		fmt.Println(<-resultsChanel)
+	}
+	close(resultsChanel)
 
 	return nil
 }
