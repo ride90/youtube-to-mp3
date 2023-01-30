@@ -1,6 +1,9 @@
 package video
 
-import "fmt"
+import (
+	"fmt"
+	"os"
+)
 
 // ChannelMessage used to communicate between a main thread and goroutines.
 type ChannelMessage struct {
@@ -25,12 +28,12 @@ func (e *ErrorBadLink) Error() string {
 	return fmt.Sprintf("Link %q %v", e.link, e.message)
 }
 
-type ErrorGetPlaybackURL struct {
+type ErrorFetchPlaybackURL struct {
 	link    string
 	message string
 }
 
-func (e *ErrorGetPlaybackURL) Error() string {
+func (e *ErrorFetchPlaybackURL) Error() string {
 	return fmt.Sprintf("Failed to get a stream URL for the link %q reason: %q", e.link, e.message)
 }
 
@@ -38,10 +41,13 @@ type Video struct {
 	url       string
 	streamUrl string
 	name      string
+	File      *os.File
 }
 
 func (v Video) String() string {
-	return fmt.Sprintf("<name=%q url=%q hasStream=%v>", v.name, v.url, v.HasStreamURL())
+	return fmt.Sprintf(
+		"<name=%q url=%q hasStream=%v> file=%v", v.name, v.url, v.HasStreamURL(), v.File,
+	)
 }
 
 func (v Video) HasStreamURL() bool {

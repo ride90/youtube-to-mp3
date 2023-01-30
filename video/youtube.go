@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"os"
 	"regexp"
 	"strings"
 
@@ -59,7 +60,7 @@ func ValidateLinks(links []string) []error {
 	return _errors
 }
 
-func GetPlaybackURL(link string, results chan<- ChannelMessage) {
+func FetchPlaybackURL(link string, results chan<- ChannelMessage) {
 	var streamURL string
 
 	// Remove all query params except `v`.
@@ -72,6 +73,7 @@ func GetPlaybackURL(link string, results chan<- ChannelMessage) {
 	}
 	_url.RawQuery = query.Encode()
 	link = _url.String()
+
 	// Make a request to YouTube.
 	// TODO: research if http session can be used here (shared between goroutines?).
 	resp, err := http.Get(link)
@@ -83,19 +85,20 @@ func GetPlaybackURL(link string, results chan<- ChannelMessage) {
 		results <- ChannelMessage{Err: errors.New(resp.Status), Link: link}
 		return
 	}
+
 	// Read body and convert to string.
 	_body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		results <- ChannelMessage{Err: err, Link: link}
 	}
 	var body = string(_body)
+
 	// Compile regex and try to find a necessary JS var (json) with a streaming URL.
 	// Compiling regex multiple times (multiple jobs) might be suboptimal.
 	regex, _ := regexp.Compile("ytInitialPlayerResponse\\s*=\\s*(\\{.+?\\})\\s*;")
 	// `map[string]any` is used due to we don't know a data structure in advance (well, almost).
 	var playerResponseData map[string]any
 	var jsonString string
-
 	if idx := regex.FindStringIndex(body); len(idx) != 0 {
 		jsonString = body[idx[0]+len("ytInitialPlayerResponse = ") : idx[1]-1]
 		// String -> JSON.
@@ -161,6 +164,7 @@ func GetPlaybackURL(link string, results chan<- ChannelMessage) {
 			return
 		}
 	}
+
 	// Try to get video stream using a youtube-dl library (ported from python).
 	client := youtube.Client{}
 	video, err := client.GetVideo(link)
@@ -183,9 +187,11 @@ func GetPlaybackURL(link string, results chan<- ChannelMessage) {
 			return
 		}
 	}
+
+	// Desired video stream was not found.
 	results <- ChannelMessage{
 		Link: link,
-		Err:  &ErrorGetPlaybackURL{link: link, message: "desired video stream was not found"},
+		Err:  &ErrorFetchPlaybackURL{link: link, message: "desired video stream was not found"},
 	}
 }
 
@@ -195,9 +201,55 @@ func FetchMetadata(video *Video, results chan<- ChannelMessage) {
 	videoMeta, _ := client.GetVideo((*video).url)
 	(*video).name = videoMeta.Title
 	results <- ChannelMessage{Result: video}
-	return
 }
 
-func DownloadVideo(streamURL string) {
+func FetchVideo(video *Video, results chan<- ChannelMessage) {
+	// Create tmp file.
+	// TODO: Add error handling.
+	file, _ := os.CreateTemp("", "yt2mp3_*_.mp4")
+	defer file.Close()
+	(*video).File = file
 
+	// Send http request, check status, read file.
+	// TODO: Add error handling.
+	resp, _ := http.Get((*video).streamUrl)
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		// TODO: Add error handling.
+	}
+	// TODO: Add error handling.
+	_, _ = io.Copy(file, resp.Body)
+
+	fmt.Println("FILE", (*file).Name())
+
+	results <- ChannelMessage{Result: video}
+}
+
+func downloadFile(filepath string, url string) (err error) {
+	// Create the file
+	out, err := os.Create(filepath)
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+
+	// Get the data
+	resp, err := http.Get(url)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	// Check server response
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("bad status: %s", resp.Status)
+	}
+
+	// Writer the body to file
+	_, err = io.Copy(out, resp.Body)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }

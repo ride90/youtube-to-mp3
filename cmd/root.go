@@ -53,24 +53,26 @@ func handleLinks(links []string) []error {
 	if len(errs) > 0 {
 		return errs
 	}
+
 	// Get playback stream URLs.
 	var videos []*video.Video
 	var errors []error
-	channelGetPlaybackURL := make(chan video.ChannelMessage, len(links))
+	channelFetchPlaybackURL := make(chan video.ChannelMessage, len(links))
 	for _, link := range links {
 		// Start go runtime thread.
-		go video.GetPlaybackURL(link, channelGetPlaybackURL)
+		go video.FetchPlaybackURL(link, channelFetchPlaybackURL)
 	}
 	for i := 0; i < len(links); i++ {
 		// Wait until all threads are done.
-		msg := <-channelGetPlaybackURL
+		msg := <-channelFetchPlaybackURL
 		if msg.Err != nil {
 			errors = append(errors, msg.Err)
 		} else if msg.Result.HasStreamURL() {
 			videos = append(videos, msg.Result)
 		}
 	}
-	close(channelGetPlaybackURL)
+	close(channelFetchPlaybackURL)
+
 	// Fetch metadata.
 	channelFetchMetadata := make(chan video.ChannelMessage, len(videos))
 	for _, _video := range videos {
@@ -78,9 +80,29 @@ func handleLinks(links []string) []error {
 	}
 	for i := 0; i < len(videos); i++ {
 		msg := <-channelFetchMetadata
-		fmt.Println(*(msg.Result))
+		if msg.Err != nil {
+			errors = append(errors, msg.Err)
+		}
 	}
 	close(channelFetchMetadata)
+
+	// Fetch and save videos as temporary files.
+	channelFetchVideo := make(chan video.ChannelMessage, len(videos))
+	for _, _video := range videos {
+		go video.FetchVideo(_video, channelFetchVideo)
+	}
+	for i := 0; i < len(videos); i++ {
+		//<-channelFetchVideo
+		msg := <-channelFetchVideo
+		if msg.Err != nil {
+			errors = append(errors, msg.Err)
+		}
+		// Cleanup file when main is over.
+		defer os.Remove((*msg.Result.File).Name())
+
+		fmt.Println(msg.Result)
+		fmt.Printf("\n\n\n")
+	}
 
 	return nil
 }
