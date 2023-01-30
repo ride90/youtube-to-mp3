@@ -18,13 +18,13 @@ const audioQualityMedium string = "AUDIO_QUALITY_MEDIUM"
 const videoQualityHigh string = "hd720"
 const videoQualityMedium string = "medium"
 const videoQualityTiny string = "tiny"
+const prefixLong string = "https://www.youtube.com/"
+const prefixShort string = "https://youtu.be/"
 
 // ValidateLinks Ensures:
-// - links are valid parseable URLs
-// - links are YouTube links
+//   - links are valid parseable URLs
+//   - links are YouTube links
 func ValidateLinks(links []string) []error {
-	const prefixLong string = "https://www.youtube.com/"
-	const prefixShort string = "https://youtu.be/"
 	var _errors []error
 
 	// Validate links. If at least one link is not valid we stop an execution.
