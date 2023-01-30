@@ -4,16 +4,16 @@ import "fmt"
 
 // ChannelMessage used to communicate between a main thread and goroutines.
 type ChannelMessage struct {
-	result Video
-	err    error
-	link   string
+	Result *Video
+	Err    error
+	Link   string
 }
 
 func (msg ChannelMessage) String() string {
-	if msg.err != nil {
-		return fmt.Sprintf("result=%v err=%v", msg.result, msg.err)
+	if msg.Err != nil {
+		return fmt.Sprintf("result=%v err=%v", msg.Result, msg.Err)
 	}
-	return fmt.Sprintf("Result: %#v", msg.result)
+	return fmt.Sprintf("Result: %#v", msg.Result)
 }
 
 type ErrorBadLink struct {
@@ -41,6 +41,9 @@ type Video struct {
 }
 
 func (v Video) String() string {
-	hasStream := v.streamUrl != ""
-	return fmt.Sprintf("name=%q url=%q hasStream=%v", v.name, v.url, hasStream)
+	return fmt.Sprintf("<name=%q url=%q hasStream=%v>", v.name, v.url, v.HasStreamURL())
+}
+
+func (v Video) HasStreamURL() bool {
+	return v.streamUrl != ""
 }

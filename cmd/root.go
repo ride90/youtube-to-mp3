@@ -54,16 +54,33 @@ func handleLinks(links []string) []error {
 		return errs
 	}
 	// Get playback stream URLs.
-	numberCount := len(links)
-	channelGetPlaybackURL := make(chan video.ChannelMessage, numberCount)
+	var videos []*video.Video
+	var errors []error
+	channelGetPlaybackURL := make(chan video.ChannelMessage, len(links))
 	for _, link := range links {
+		// Start go runtime thread.
 		go video.GetPlaybackURL(link, channelGetPlaybackURL)
 	}
-	for a := 1; a <= numberCount; a++ {
-		fmt.Println(<-channelGetPlaybackURL)
-		fmt.Printf("\n\n")
+	for i := 0; i < len(links); i++ {
+		// Wait until all threads are done.
+		msg := <-channelGetPlaybackURL
+		if msg.Err != nil {
+			errors = append(errors, msg.Err)
+		} else if msg.Result.HasStreamURL() {
+			videos = append(videos, msg.Result)
+		}
 	}
 	close(channelGetPlaybackURL)
+	// Fetch metadata.
+	channelFetchMetadata := make(chan video.ChannelMessage, len(videos))
+	for _, _video := range videos {
+		go video.FetchMetadata(_video, channelFetchMetadata)
+	}
+	for i := 0; i < len(videos); i++ {
+		msg := <-channelFetchMetadata
+		fmt.Println(*(msg.Result))
+	}
+	close(channelFetchMetadata)
 
 	return nil
 }

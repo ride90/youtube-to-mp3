@@ -73,19 +73,20 @@ func GetPlaybackURL(link string, results chan<- ChannelMessage) {
 	_url.RawQuery = query.Encode()
 	link = _url.String()
 	// Make a request to YouTube.
+	// TODO: research if http session can be used here (shared between goroutines?).
 	resp, err := http.Get(link)
 	defer resp.Body.Close()
 	if err != nil {
-		results <- ChannelMessage{err: err}
+		results <- ChannelMessage{Err: err}
 		return
 	} else if resp.StatusCode != http.StatusOK {
-		results <- ChannelMessage{err: errors.New(resp.Status), link: link}
+		results <- ChannelMessage{Err: errors.New(resp.Status), Link: link}
 		return
 	}
 	// Read body and convert to string.
 	_body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		results <- ChannelMessage{err: err, link: link}
+		results <- ChannelMessage{Err: err, Link: link}
 	}
 	var body = string(_body)
 	// Compile regex and try to find a necessary JS var (json) with a streaming URL.
@@ -103,7 +104,7 @@ func GetPlaybackURL(link string, results chan<- ChannelMessage) {
 			&playerResponseData,
 		)
 		if err != nil {
-			results <- ChannelMessage{err: err, link: link}
+			results <- ChannelMessage{Err: err, Link: link}
 			return
 		}
 		// At his point we may or may not find a stream URl in next places:
@@ -154,8 +155,8 @@ func GetPlaybackURL(link string, results chan<- ChannelMessage) {
 		// If not, we'll use YouTube dl lib to get the stream url of protected videos/channels.
 		if streamURL != "" {
 			results <- ChannelMessage{
-				result: Video{streamUrl: streamURL, url: link},
-				link:   link,
+				Result: &Video{streamUrl: streamURL, url: link},
+				Link:   link,
 			}
 			return
 		}
@@ -171,25 +172,30 @@ func GetPlaybackURL(link string, results chan<- ChannelMessage) {
 			// Magic happens here and we get our video stream URL.
 			_streamURL, err := client.GetStreamURL(video, &format)
 			if err != nil {
-				results <- ChannelMessage{err: err, link: link}
+				results <- ChannelMessage{Err: err, Link: link}
 				return
 			}
 			streamURL = _streamURL
 			results <- ChannelMessage{
-				result: Video{streamUrl: streamURL, url: link},
-				link:   link,
+				Result: &Video{streamUrl: streamURL, url: link},
+				Link:   link,
 			}
 			return
 		}
 	}
 	results <- ChannelMessage{
-		link: link,
-		err:  &ErrorGetPlaybackURL{link: link, message: "desired video stream was not found"},
+		Link: link,
+		Err:  &ErrorGetPlaybackURL{link: link, message: "desired video stream was not found"},
 	}
 }
 
-func FetchMetadata(link string) {
-
+func FetchMetadata(video *Video, results chan<- ChannelMessage) {
+	client := youtube.Client{}
+	// TODO: Add error handling.
+	videoMeta, _ := client.GetVideo((*video).url)
+	(*video).name = videoMeta.Title
+	results <- ChannelMessage{Result: video}
+	return
 }
 
 func DownloadVideo(streamURL string) {
