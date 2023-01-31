@@ -10,7 +10,9 @@ import (
 	"os"
 	"regexp"
 	"strings"
+	"time"
 
+	"github.com/gosuri/uiprogress"
 	"github.com/kkdai/youtube/v2"
 )
 
@@ -26,6 +28,13 @@ const prefixShort string = "https://youtu.be/"
 //   - links are YouTube links
 func ValidateLinks(links []string) []error {
 	var _errors []error
+
+	// Get bar and do initial increment (seems like a bug).
+	bar := uiprogress.AddBar(len(links))
+	bar.PrependFunc(func(b *uiprogress.Bar) string {
+		return fmt.Sprintf("[Validate links]    ")
+	})
+	bar.Incr()
 
 	// Validate links. If at least one link is not valid we stop an execution.
 	for _, link := range links {
@@ -56,6 +65,9 @@ func ValidateLinks(links []string) []error {
 				},
 			)
 		}
+		// Artificial micro delay wouldn't hurt here (to avoid steps not being rendered in time).
+		bar.Incr()
+		time.Sleep(time.Millisecond * 50)
 	}
 	return _errors
 }
@@ -63,7 +75,20 @@ func ValidateLinks(links []string) []error {
 func FetchPlaybackURL(link string, results chan<- ChannelMessage) {
 	var streamURL string
 
-	// Remove all query params except `v`.
+	// Get bar with steps.
+	var steps = []string{"cleaning up links..", "getting direct stream..", "got a stream!"}
+	bar := uiprogress.AddBar(len(steps))
+	bar.AppendFunc(func(b *uiprogress.Bar) string {
+		return fmt.Sprintf("%v - %v", link, steps[b.Current()-1])
+	})
+	bar.PrependFunc(func(b *uiprogress.Bar) string {
+		return fmt.Sprintf("[Get the stream URL]")
+	})
+
+	// Clean up links.
+	//  - remove all query params except `v`
+	bar.Incr()
+	time.Sleep(time.Millisecond * 50)
 	_url, _ := url.ParseRequestURI(link)
 	query, _ := url.ParseQuery(_url.RawQuery)
 	for k, _ := range query {
@@ -76,6 +101,8 @@ func FetchPlaybackURL(link string, results chan<- ChannelMessage) {
 
 	// Make a request to YouTube.
 	// TODO: research if http session can be used here (shared between goroutines?).
+	bar.Incr()
+	time.Sleep(time.Millisecond * 50)
 	resp, err := http.Get(link)
 	defer resp.Body.Close()
 	if err != nil {
@@ -130,6 +157,8 @@ func FetchPlaybackURL(link string, results chan<- ChannelMessage) {
 		//  - Use itag to classify streams by their properties.
 		//  - Choose a stream and download it in segments.(see another further in the code).
 		//  To handle this case youtube-dl lib will be used (see further in the code).
+		// TODO: Handle interface conversion: interface {} is nil, not map[string]interface {}.
+		// 	Appears when youtube link provided but id doesn't exist.
 		formats := playerResponseData["streamingData"].(map[string]any)["formats"].([]any)
 		for _, v := range formats {
 			// Ensure we have all keys we need.
@@ -157,6 +186,8 @@ func FetchPlaybackURL(link string, results chan<- ChannelMessage) {
 		// At this point if we have a stream URL we are fine, and we can use it.
 		// If not, we'll use YouTube dl lib to get the stream url of protected videos/channels.
 		if streamURL != "" {
+			bar.Incr()
+			time.Sleep(time.Millisecond * 50)
 			results <- ChannelMessage{
 				Result: &Video{streamUrl: streamURL, url: link},
 				Link:   link,
@@ -180,6 +211,8 @@ func FetchPlaybackURL(link string, results chan<- ChannelMessage) {
 				return
 			}
 			streamURL = _streamURL
+			bar.Incr()
+			time.Sleep(time.Millisecond * 50)
 			results <- ChannelMessage{
 				Result: &Video{streamUrl: streamURL, url: link},
 				Link:   link,
@@ -196,10 +229,26 @@ func FetchPlaybackURL(link string, results chan<- ChannelMessage) {
 }
 
 func FetchMetadata(video *Video, results chan<- ChannelMessage) {
+	// Get bar with steps.
+	var steps = []string{"getting metadata..", "got metadata!"}
+	bar := uiprogress.AddBar(len(steps))
+	bar.AppendFunc(func(b *uiprogress.Bar) string {
+		return fmt.Sprintf("%v - %v", (*video).url, steps[b.Current()-1])
+	})
+	bar.PrependFunc(func(b *uiprogress.Bar) string {
+		return fmt.Sprintf("[Get metadata]      ")
+	})
+
+	// Get youtube dl client and fetch metadata for the video.
+	bar.Incr()
+	time.Sleep(time.Millisecond * 50)
 	client := youtube.Client{}
 	// TODO: Add error handling.
 	videoMeta, _ := client.GetVideo((*video).url)
 	(*video).name = videoMeta.Title
+
+	bar.Incr()
+	time.Sleep(time.Millisecond * 50)
 	results <- ChannelMessage{Result: video}
 }
 
@@ -217,39 +266,21 @@ func FetchVideo(video *Video, results chan<- ChannelMessage) {
 	if resp.StatusCode != http.StatusOK {
 		// TODO: Add error handling.
 	}
-	// TODO: Add error handling.
-	_, _ = io.Copy(file, resp.Body)
 
-	fmt.Println("FILE", (*file).Name())
+	// Add progress bar to track fetching progress.
+	time.Sleep(time.Millisecond * 50)
+	bar := uiprogress.AddBar(int(resp.ContentLength) + 1)
+	bar.AppendFunc(func(b *uiprogress.Bar) string {
+		return fmt.Sprintf("%v bytes - %q", b.Current(), (*video).name)
+	})
+	bar.PrependFunc(func(b *uiprogress.Bar) string {
+		return fmt.Sprintf("[Downloading video] ")
+	})
+
+	// Download video using a custom io reader.
+	pbreader := &PBReader{Reader: resp.Body, bar: bar}
+	// TODO: Add error handling.
+	_, _ = io.Copy(file, pbreader)
 
 	results <- ChannelMessage{Result: video}
-}
-
-func downloadFile(filepath string, url string) (err error) {
-	// Create the file
-	out, err := os.Create(filepath)
-	if err != nil {
-		return err
-	}
-	defer out.Close()
-
-	// Get the data
-	resp, err := http.Get(url)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-
-	// Check server response
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("bad status: %s", resp.Status)
-	}
-
-	// Writer the body to file
-	_, err = io.Copy(out, resp.Body)
-	if err != nil {
-		return err
-	}
-
-	return nil
 }

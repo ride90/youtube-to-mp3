@@ -1,9 +1,9 @@
 package cmd
 
 import (
-	"fmt"
 	"os"
 
+	"github.com/gosuri/uiprogress"
 	"github.com/spf13/cobra"
 
 	"github.com/ride90/youtube-to-mp3/video"
@@ -24,6 +24,8 @@ var rootCmd = &cobra.Command{
 			_ = cmd.Help()
 			os.Exit(0)
 		}
+		// Init progress bar.
+		uiprogress.Start()
 		// Handle links.
 		if len(links) > 0 {
 			errs := handleLinks(links)
@@ -86,7 +88,7 @@ func handleLinks(links []string) []error {
 	}
 	close(channelFetchMetadata)
 
-	// Fetch and save videos as temporary files.
+	// Fetch and save temp video files.
 	channelFetchVideo := make(chan video.ChannelMessage, len(videos))
 	for _, _video := range videos {
 		go video.FetchVideo(_video, channelFetchVideo)
@@ -97,14 +99,13 @@ func handleLinks(links []string) []error {
 		if msg.Err != nil {
 			errors = append(errors, msg.Err)
 		}
-		// Cleanup file when main is over.
+		// Cleanup file when main function is over.
 		defer os.Remove((*msg.Result.File).Name())
-
-		fmt.Println(msg.Result)
-		fmt.Printf("\n\n\n")
+		//fmt.Println(msg.Result)
+		//fmt.Printf("\n\n\n")
 	}
 
-	return nil
+	return errors
 }
 
 func handleNames(names []string) {
