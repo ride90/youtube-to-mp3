@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"fmt"
 	"os"
 
 	"github.com/gosuri/uiprogress"
@@ -10,6 +11,7 @@ import (
 )
 
 var names, links []string
+var destination string
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
@@ -28,7 +30,7 @@ var rootCmd = &cobra.Command{
 		uiprogress.Start()
 		// Handle links.
 		if len(links) > 0 {
-			errs := handleLinks(links)
+			errs := handleLinks(cmd, links)
 			// Stdout errors and exit.
 			if len(errs) > 0 {
 				cmd.Printf("\nThe following issues occurred during execution:\n")
@@ -49,7 +51,7 @@ var rootCmd = &cobra.Command{
 	},
 }
 
-func handleLinks(links []string) []error {
+func handleLinks(cmd *cobra.Command, links []string) []error {
 	// Validate links. If at least one link is not valid we stop an execution.
 	errs := video.ValidateLinks(links)
 	if len(errs) > 0 {
@@ -101,7 +103,7 @@ func handleLinks(links []string) []error {
 		}
 		// Cleanup file when main function is over.
 		defer os.Remove((*msg.Result.File).Name())
-		//fmt.Println(msg.Result)
+		fmt.Println(msg.Result)
 		//fmt.Printf("\n\n\n")
 	}
 
@@ -125,4 +127,5 @@ func init() {
 	// Define flags.
 	rootCmd.Flags().StringSliceVarP(&names, "names", "n", []string{}, "")
 	rootCmd.Flags().StringSliceVarP(&links, "links", "l", []string{}, "")
+	rootCmd.Flags().StringP("dest", "d", "", "")
 }

@@ -41,12 +41,13 @@ type Video struct {
 	url       string
 	streamUrl string
 	name      string
+	mimeType  string
 	File      *os.File
 }
 
 func (v Video) String() string {
 	return fmt.Sprintf(
-		"<name=%q url=%q hasStream=%v> file=%v", v.name, v.url, v.HasStreamURL(), v.File,
+		"<name=%q url=%q hasStream=%v file=%v mime=%v>", v.name, v.url, v.HasStreamURL(), v.File, v.mimeType,
 	)
 }
 

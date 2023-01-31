@@ -32,7 +32,7 @@ func ValidateLinks(links []string) []error {
 	// Get bar and do initial increment (seems like a bug).
 	bar := uiprogress.AddBar(len(links))
 	bar.PrependFunc(func(b *uiprogress.Bar) string {
-		return fmt.Sprintf("[Validate links]    ")
+		return fmt.Sprintf("[Check links]")
 	})
 	bar.Incr()
 
@@ -73,7 +73,7 @@ func ValidateLinks(links []string) []error {
 }
 
 func FetchPlaybackURL(link string, results chan<- ChannelMessage) {
-	var streamURL string
+	var video Video
 
 	// Get bar with steps.
 	var steps = []string{"cleaning up links..", "getting direct stream..", "got a stream!"}
@@ -82,7 +82,7 @@ func FetchPlaybackURL(link string, results chan<- ChannelMessage) {
 		return fmt.Sprintf("%v - %v", link, steps[b.Current()-1])
 	})
 	bar.PrependFunc(func(b *uiprogress.Bar) string {
-		return fmt.Sprintf("[Get the stream URL]")
+		return fmt.Sprintf("[Get stream] ")
 	})
 
 	// Clean up links.
@@ -97,26 +97,26 @@ func FetchPlaybackURL(link string, results chan<- ChannelMessage) {
 		}
 	}
 	_url.RawQuery = query.Encode()
-	link = _url.String()
+	video.url = _url.String()
 
 	// Make a request to YouTube.
 	// TODO: research if http session can be used here (shared between goroutines?).
 	bar.Incr()
 	time.Sleep(time.Millisecond * 50)
-	resp, err := http.Get(link)
+	resp, err := http.Get(video.url)
 	defer resp.Body.Close()
 	if err != nil {
 		results <- ChannelMessage{Err: err}
 		return
 	} else if resp.StatusCode != http.StatusOK {
-		results <- ChannelMessage{Err: errors.New(resp.Status), Link: link}
+		results <- ChannelMessage{Err: errors.New(resp.Status), Link: video.url}
 		return
 	}
 
 	// Read body and convert to string.
 	_body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		results <- ChannelMessage{Err: err, Link: link}
+		results <- ChannelMessage{Err: err, Link: video.url}
 	}
 	var body = string(_body)
 
@@ -134,7 +134,7 @@ func FetchPlaybackURL(link string, results chan<- ChannelMessage) {
 			&playerResponseData,
 		)
 		if err != nil {
-			results <- ChannelMessage{Err: err, Link: link}
+			results <- ChannelMessage{Err: err, Link: video.url}
 			return
 		}
 		// At his point we may or may not find a stream URl in next places:
@@ -165,32 +165,34 @@ func FetchPlaybackURL(link string, results chan<- ChannelMessage) {
 			var hasQuality bool = v.(map[string]any)["quality"] != nil
 			var hasURL bool = v.(map[string]any)["url"] != nil
 			var hasAudioQuality bool = v.(map[string]any)["audioQuality"] != nil
-			if !hasQuality || !hasURL || !hasAudioQuality {
+			var hasMimeType bool = v.(map[string]any)["mimeType"] != nil
+			if !hasQuality || !hasURL || !hasAudioQuality || hasMimeType {
 				continue
 			}
 			// Try to get strings from underlying value.
 			quality, okQuality := v.(map[string]any)["quality"].(string)
 			audioQuality, okAudioQuality := v.(map[string]any)["audioQuality"].(string)
-			_streamURL, okStreamURL := v.(map[string]any)["url"].(string)
-			if !okQuality || !okAudioQuality || !okStreamURL {
+			mimeType, okMimeType := v.(map[string]any)["mimeType"].(string)
+			streamURL, okStreamURL := v.(map[string]any)["url"].(string)
+			if !okQuality || !okAudioQuality || !okStreamURL || okMimeType {
 				continue
 			}
 			// Get only tiny/medium/hd with a medium audio quality.
 			// No need for an explicit sorting (at least for now) since tiny goes first in the response array.
 			isQuality := quality == videoQualityTiny || quality == videoQualityMedium || quality == videoQualityHigh
 			if isQuality && audioQuality == audioQualityMedium {
-				streamURL = _streamURL
+				video.streamUrl, video.mimeType = streamURL, mimeType
 				break
 			}
 		}
 		// At this point if we have a stream URL we are fine, and we can use it.
 		// If not, we'll use YouTube dl lib to get the stream url of protected videos/channels.
-		if streamURL != "" {
+		if video.HasStreamURL() {
 			bar.Incr()
 			time.Sleep(time.Millisecond * 50)
 			results <- ChannelMessage{
-				Result: &Video{streamUrl: streamURL, url: link},
-				Link:   link,
+				Result: &video,
+				Link:   video.url,
 			}
 			return
 		}
@@ -198,23 +200,23 @@ func FetchPlaybackURL(link string, results chan<- ChannelMessage) {
 
 	// Try to get video stream using a youtube-dl library (ported from python).
 	client := youtube.Client{}
-	video, err := client.GetVideo(link)
-	formats := video.Formats.WithAudioChannels()
+	dlvideo, err := client.GetVideo(link)
+	formats := dlvideo.Formats.WithAudioChannels()
 	// Loop through formats until we find the one which fits our needs: lightest video (if possible), medium audio.
 	for _, format := range formats {
 		isQuality := format.Quality == videoQualityTiny || format.Quality == videoQualityMedium || format.Quality == videoQualityHigh
 		if isQuality && format.AudioQuality == audioQualityMedium {
 			// Magic happens here and we get our video stream URL.
-			_streamURL, err := client.GetStreamURL(video, &format)
+			streamURL, err := client.GetStreamURL(dlvideo, &format)
 			if err != nil {
 				results <- ChannelMessage{Err: err, Link: link}
 				return
 			}
-			streamURL = _streamURL
+			video.streamUrl, video.mimeType = streamURL, format.MimeType
 			bar.Incr()
 			time.Sleep(time.Millisecond * 50)
 			results <- ChannelMessage{
-				Result: &Video{streamUrl: streamURL, url: link},
+				Result: &video,
 				Link:   link,
 			}
 			return
@@ -236,7 +238,7 @@ func FetchMetadata(video *Video, results chan<- ChannelMessage) {
 		return fmt.Sprintf("%v - %v", (*video).url, steps[b.Current()-1])
 	})
 	bar.PrependFunc(func(b *uiprogress.Bar) string {
-		return fmt.Sprintf("[Get metadata]      ")
+		return fmt.Sprintf("[Metadata]   ")
 	})
 
 	// Get youtube dl client and fetch metadata for the video.
@@ -274,13 +276,14 @@ func FetchVideo(video *Video, results chan<- ChannelMessage) {
 		return fmt.Sprintf("%v bytes - %q", b.Current(), (*video).name)
 	})
 	bar.PrependFunc(func(b *uiprogress.Bar) string {
-		return fmt.Sprintf("[Downloading video] ")
+		return fmt.Sprintf("[Download]   ")
 	})
 
 	// Download video using a custom io reader.
 	pbreader := &PBReader{Reader: resp.Body, bar: bar}
 	// TODO: Add error handling.
 	_, _ = io.Copy(file, pbreader)
+	time.Sleep(time.Millisecond * 50)
 
 	results <- ChannelMessage{Result: video}
 }
