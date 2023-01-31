@@ -104,9 +104,9 @@ func FetchPlaybackURL(link string, results chan<- ChannelMessage) {
 	video.url = _url.String()
 
 	// Make a request to YouTube.
-	// TODO: research if http session can be used here (shared between goroutines?).
 	bar.Incr()
 	time.Sleep(time.Millisecond * 50)
+	// TODO: Use an http session.
 	resp, err := http.Get(video.url)
 	defer resp.Body.Close()
 	if err != nil {
@@ -250,8 +250,11 @@ func FetchMetadata(video *Video, results chan<- ChannelMessage) {
 	bar.Incr()
 	time.Sleep(time.Millisecond * 50)
 	client := youtube.Client{}
-	// TODO: Add error handling.
-	videoMeta, _ := client.GetVideo((*video).url)
+	videoMeta, err := client.GetVideo((*video).url)
+	if err != nil {
+		results <- ChannelMessage{Err: err}
+		return
+	}
 	(*video).name = videoMeta.Title
 
 	bar.Incr()
@@ -261,16 +264,29 @@ func FetchMetadata(video *Video, results chan<- ChannelMessage) {
 
 func FetchVideo(video *Video, results chan<- ChannelMessage) {
 	// Create tmp file.
-	// TODO: Add error handling.
-	file, _ := os.CreateTemp("", "yt2mp3_*")
+	file, err := os.CreateTemp("", "yt2mp3_*")
+	if err != nil {
+		results <- ChannelMessage{Err: err}
+		return
+	}
 	(*video).File = file
 
 	// Send http request, check status, read file.
-	// TODO: Add error handling.
-	resp, _ := http.Get((*video).streamUrl)
+	resp, err := http.Get((*video).streamUrl)
+	if err != nil {
+		results <- ChannelMessage{Err: err}
+		return
+	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		// TODO: Add error handling.
+		if err != nil {
+			results <- ChannelMessage{
+				Err: errors.New(
+					fmt.Sprintf("%q returned http status resp %q", (*video).streamUrl, resp.StatusCode),
+				),
+			}
+			return
+		}
 	}
 
 	// Add progress bar to track fetching progress.
@@ -287,7 +303,11 @@ func FetchVideo(video *Video, results chan<- ChannelMessage) {
 	// Download video using a custom io reader.
 	pbreader := &PBReader{Reader: resp.Body, bar: bar}
 	// TODO: Add error handling.
-	_, _ = io.Copy((*video).File, pbreader)
+	_, err = io.Copy((*video).File, pbreader)
+	if err != nil {
+		results <- ChannelMessage{Err: err}
+		return
+	}
 	(*video).File.Close()
 
 	time.Sleep(time.Millisecond * 50)

@@ -37,8 +37,8 @@ var rootCmd = &cobra.Command{
 					cmd.Printf(" - %v\n", err)
 				}
 				cmd.Printf(
-					"\nAddress errors and retry." +
-						"\nYou can also send a pull request https://github.com/ride90/youtube-to-mp3 :)\n\n",
+					"\nAddress errors and retry.\n" +
+						"You can also send a pull request https://github.com/ride90/youtube-to-mp3 :)\n\n",
 				)
 				os.Exit(1)
 			}
