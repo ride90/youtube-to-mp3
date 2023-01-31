@@ -246,7 +246,7 @@ func FetchMetadata(video *Video, results chan<- ChannelMessage) {
 		return fmt.Sprintf("[Metadata]   ")
 	})
 
-	// Get youtube dl client and fetch metadata for the video.
+	// Fetch metadata for the video.
 	bar.Incr()
 	time.Sleep(time.Millisecond * 50)
 	client := youtube.Client{}
@@ -262,8 +262,7 @@ func FetchMetadata(video *Video, results chan<- ChannelMessage) {
 func FetchVideo(video *Video, results chan<- ChannelMessage) {
 	// Create tmp file.
 	// TODO: Add error handling.
-	file, _ := os.CreateTemp("", "yt2mp3_*.mp4")
-	defer file.Close()
+	file, _ := os.CreateTemp("", "yt2mp3_*")
 	(*video).File = file
 
 	// Send http request, check status, read file.
@@ -288,7 +287,8 @@ func FetchVideo(video *Video, results chan<- ChannelMessage) {
 	// Download video using a custom io reader.
 	pbreader := &PBReader{Reader: resp.Body, bar: bar}
 	// TODO: Add error handling.
-	_, _ = io.Copy(file, pbreader)
+	_, _ = io.Copy((*video).File, pbreader)
+	(*video).File.Close()
 
 	time.Sleep(time.Millisecond * 50)
 	results <- ChannelMessage{Result: video}
