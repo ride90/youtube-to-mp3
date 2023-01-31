@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/gosuri/uiprogress"
+	"github.com/gosuri/uiprogress/util/strutil"
 	"github.com/kkdai/youtube/v2"
 )
 
@@ -22,6 +23,7 @@ const videoQualityMedium string = "medium"
 const videoQualityTiny string = "tiny"
 const prefixLong string = "https://www.youtube.com/"
 const prefixShort string = "https://youtu.be/"
+const progressBarWidth int = 40
 
 // ValidateLinks Ensures:
 //   - links are valid parseable URLs
@@ -31,6 +33,7 @@ func ValidateLinks(links []string) []error {
 
 	// Get bar and do initial increment (seems like a bug).
 	bar := uiprogress.AddBar(len(links))
+	bar.Width = progressBarWidth
 	bar.PrependFunc(func(b *uiprogress.Bar) string {
 		return fmt.Sprintf("[Check links]")
 	})
@@ -78,6 +81,7 @@ func FetchPlaybackURL(link string, results chan<- ChannelMessage) {
 	// Get bar with steps.
 	var steps = []string{"cleaning up links..", "getting direct stream..", "got a stream!"}
 	bar := uiprogress.AddBar(len(steps))
+	bar.Width = progressBarWidth
 	bar.AppendFunc(func(b *uiprogress.Bar) string {
 		return fmt.Sprintf("%v - %v", link, steps[b.Current()-1])
 	})
@@ -234,6 +238,7 @@ func FetchMetadata(video *Video, results chan<- ChannelMessage) {
 	// Get bar with steps.
 	var steps = []string{"getting metadata..", "got metadata!"}
 	bar := uiprogress.AddBar(len(steps))
+	bar.Width = progressBarWidth
 	bar.AppendFunc(func(b *uiprogress.Bar) string {
 		return fmt.Sprintf("%v - %v", (*video).url, steps[b.Current()-1])
 	})
@@ -257,7 +262,7 @@ func FetchMetadata(video *Video, results chan<- ChannelMessage) {
 func FetchVideo(video *Video, results chan<- ChannelMessage) {
 	// Create tmp file.
 	// TODO: Add error handling.
-	file, _ := os.CreateTemp("", "yt2mp3_*_.mp4")
+	file, _ := os.CreateTemp("", "yt2mp3_*.mp4")
 	defer file.Close()
 	(*video).File = file
 
@@ -272,8 +277,9 @@ func FetchVideo(video *Video, results chan<- ChannelMessage) {
 	// Add progress bar to track fetching progress.
 	time.Sleep(time.Millisecond * 50)
 	bar := uiprogress.AddBar(int(resp.ContentLength) + 1)
+	bar.Width = progressBarWidth
 	bar.AppendFunc(func(b *uiprogress.Bar) string {
-		return fmt.Sprintf("%v bytes - %q", b.Current(), (*video).name)
+		return strutil.Resize(fmt.Sprintf("%v bytes - %q", b.Current(), (*video).name), 59)
 	})
 	bar.PrependFunc(func(b *uiprogress.Bar) string {
 		return fmt.Sprintf("[Download]   ")
@@ -283,7 +289,7 @@ func FetchVideo(video *Video, results chan<- ChannelMessage) {
 	pbreader := &PBReader{Reader: resp.Body, bar: bar}
 	// TODO: Add error handling.
 	_, _ = io.Copy(file, pbreader)
-	time.Sleep(time.Millisecond * 50)
 
+	time.Sleep(time.Millisecond * 50)
 	results <- ChannelMessage{Result: video}
 }

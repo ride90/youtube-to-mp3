@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"fmt"
 	"os"
 
 	"github.com/gosuri/uiprogress"
@@ -90,21 +89,37 @@ func handleLinks(cmd *cobra.Command, links []string) []error {
 	}
 	close(channelFetchMetadata)
 
-	// Fetch and save temp video files.
+	// Download and save temp video files.
 	channelFetchVideo := make(chan video.ChannelMessage, len(videos))
 	for _, _video := range videos {
 		go video.FetchVideo(_video, channelFetchVideo)
 	}
 	for i := 0; i < len(videos); i++ {
-		//<-channelFetchVideo
 		msg := <-channelFetchVideo
 		if msg.Err != nil {
 			errors = append(errors, msg.Err)
 		}
-		// Cleanup file when main function is over.
-		defer os.Remove((*msg.Result.File).Name())
-		fmt.Println(msg.Result)
-		//fmt.Printf("\n\n\n")
+	}
+	// Cleanup file when main function is over.
+	defer func(videos []*video.Video) {
+		for _, v := range videos {
+			err := os.Remove((*v.File).Name())
+			if err != nil {
+				errors = append(errors, err)
+			}
+		}
+	}(videos)
+
+	// Run ffmpeg and convert videos to mp3 files.
+	channelConvertVideoToAudio := make(chan video.ChannelMessage, len(videos))
+	for _, _video := range videos {
+		go video.ConvertVideoToAudio(_video, channelConvertVideoToAudio)
+	}
+	for i := 0; i < len(videos); i++ {
+		msg := <-channelConvertVideoToAudio
+		if msg.Err != nil {
+			errors = append(errors, msg.Err)
+		}
 	}
 
 	return errors

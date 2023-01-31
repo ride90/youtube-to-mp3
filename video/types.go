@@ -38,16 +38,18 @@ func (e *ErrorFetchPlaybackURL) Error() string {
 }
 
 type Video struct {
-	url       string
-	streamUrl string
-	name      string
-	mimeType  string
-	File      *os.File
+	url           string
+	streamUrl     string
+	name          string
+	mimeType      string
+	File          *os.File
+	AudioFilePath string
 }
 
 func (v Video) String() string {
 	return fmt.Sprintf(
-		"<name=%q url=%q hasStream=%v file=%v mime=%v>", v.name, v.url, v.HasStreamURL(), v.File, v.mimeType,
+		"<name=%q url=%q hasStream=%v mime=%v file=%v audio=%v>",
+		v.name, v.url, v.HasStreamURL(), v.mimeType, *v.File, *v.FileAudio,
 	)
 }
 
