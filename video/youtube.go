@@ -300,7 +300,10 @@ func FetchVideo(video *Video, results chan<- ChannelMessage) {
 	bar := uiprogress.AddBar(int(resp.ContentLength) + 1)
 	bar.Width = progressBarWidth
 	bar.AppendFunc(func(b *uiprogress.Bar) string {
-		return strutil.Resize(fmt.Sprintf("%v bytes - %q", b.Current(), (*video).name), 59)
+		return fmt.Sprintf(
+			"%v - %v bytes",
+			strutil.Resize((*video).name, 44),
+			b.Current())
 	})
 	bar.PrependFunc(func(b *uiprogress.Bar) string {
 		return fmt.Sprintf("[Download]   ")
