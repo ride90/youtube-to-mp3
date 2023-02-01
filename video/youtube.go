@@ -168,6 +168,7 @@ func FetchPlaybackURL(link string, results chan<- ChannelMessage) {
 				Err:  errors.New(fmt.Sprintf("Not expected response data for the link %v. Check if link leads to a youtube video.", video.url)),
 				Link: video.url,
 			}
+			return
 		}
 		formats := playerResponseData["streamingData"].(map[string]any)["formats"].([]any)
 		for _, v := range formats {

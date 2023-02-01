@@ -9,7 +9,7 @@ import (
 	"github.com/ride90/youtube-to-mp3/video"
 )
 
-var names, links []string
+var links []string
 var destination string
 
 // rootCmd represents the base command when called without any subcommands
@@ -20,32 +20,21 @@ var rootCmd = &cobra.Command{
 	Args:      cobra.OnlyValidArgs,
 	ValidArgs: []string{"names", "links", "yt2mp3"},
 	Run: func(cmd *cobra.Command, args []string) {
-		// Show help if no args provided.
-		if len(names) == 0 && len(links) == 0 {
-			_ = cmd.Help()
-			os.Exit(0)
-		}
 		// Init progress bar.
 		uiprogress.Start()
 		// Handle links.
-		if len(links) > 0 {
-			errs := handleLinks(cmd, links)
-			// Stdout errors and exit.
-			if len(errs) > 0 {
-				cmd.Printf("\nThe following issues occurred during execution:\n")
-				for _, err := range errs {
-					cmd.Printf(" - %v\n", err)
-				}
-				cmd.Printf(
-					"\nAddress errors and retry.\n" +
-						"You can also send a pull request https://github.com/ride90/youtube-to-mp3 :)\n\n",
-				)
-				os.Exit(1)
+		errs := handleLinks(cmd, links)
+		// Stdout errors and exit.
+		if len(errs) > 0 {
+			cmd.Printf("\nThe following issues occurred during execution:\n")
+			for _, err := range errs {
+				cmd.Printf(" - %v\n", err)
 			}
-		}
-		// Handle names.
-		if len(names) > 0 {
-			handleNames(names)
+			cmd.Printf(
+				"\nAddress errors and retry.\n" +
+					"You can also send a pull request https://github.com/ride90/youtube-to-mp3 :)\n\n",
+			)
+			os.Exit(1)
 		}
 	},
 }
@@ -126,10 +115,6 @@ func handleLinks(cmd *cobra.Command, links []string) []error {
 	return errors
 }
 
-func handleNames(names []string) {
-	panic("handleNames is not implemented")
-}
-
 // Execute This is called by main.main().
 // It only needs to happen once to the rootCmd.
 func Execute() {
@@ -142,13 +127,10 @@ func Execute() {
 func init() {
 	// Define flags.
 	rootCmd.Flags().StringSliceVarP(
-		&names, "names", "n", []string{},
-		"List of names which will be used to search for videos.",
-	)
-	rootCmd.Flags().StringSliceVarP(
 		&links, "links", "l", []string{},
 		"List of direct YouTube video links.",
 	)
+	rootCmd.MarkFlagRequired("links")
 	workingDir, _ := os.Getwd()
 	rootCmd.Flags().StringP(
 		"dst", "d", workingDir,
