@@ -161,8 +161,14 @@ func FetchPlaybackURL(link string, results chan<- ChannelMessage) {
 		//  - Use itag to classify streams by their properties.
 		//  - Choose a stream and download it in segments.(see another further in the code).
 		//  To handle this case youtube-dl lib will be used (see further in the code).
-		// TODO: Handle interface conversion: interface {} is nil, not map[string]interface {}.
-		// 	Appears when youtube link provided but id doesn't exist.
+		// TODO: Rework they way JSON is handled here. Try to use structures with fallbacks.
+		// 	Idea is to avoid this ygly `has key` checks and rather fallback to defaults.
+		if playerResponseData["streamingData"] == nil {
+			results <- ChannelMessage{
+				Err:  errors.New(fmt.Sprintf("Not expected response data for the link %v. Check if link leads to a youtube video.", video.url)),
+				Link: video.url,
+			}
+		}
 		formats := playerResponseData["streamingData"].(map[string]any)["formats"].([]any)
 		for _, v := range formats {
 			// Ensure we have all keys we need.

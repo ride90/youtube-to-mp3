@@ -52,10 +52,10 @@ var rootCmd = &cobra.Command{
 
 func handleLinks(cmd *cobra.Command, links []string) []error {
 	// Validate links. If at least one link is not valid we stop an execution.
-	errs := video.ValidateLinks(links)
-	if len(errs) > 0 {
-		return errs
-	}
+	//errs := video.ValidateLinks(links)
+	//if len(errs) > 0 {
+	//	return errs
+	//}
 
 	// Get playback stream URLs.
 	var videos []*video.Video
