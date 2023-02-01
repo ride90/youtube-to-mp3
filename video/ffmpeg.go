@@ -2,7 +2,6 @@ package video
 
 import (
 	"fmt"
-	"os"
 	"os/exec"
 	"path"
 	"path/filepath"
@@ -12,7 +11,7 @@ import (
 	"github.com/gosuri/uiprogress"
 )
 
-func ConvertVideoToAudio(video *Video, results chan<- ChannelMessage) {
+func ConvertVideoToAudio(video *Video, dstDir string, results chan<- ChannelMessage) {
 	// Get bar with steps.
 	var steps = []string{"Converting to audio", "DONE!"}
 	bar := uiprogress.AddBar(len(steps))
@@ -27,9 +26,8 @@ func ConvertVideoToAudio(video *Video, results chan<- ChannelMessage) {
 	// Prepare ffmpeg cmd.
 	bar.Incr()
 	time.Sleep(time.Millisecond * 50)
-	workingDir, _ := os.Getwd()
 	inputPath, _ := filepath.Abs(video.File.Name())
-	outputPath := path.Join(workingDir, fmt.Sprintf("%v.mp3", slug.Make(video.name)))
+	outputPath := path.Join(dstDir, fmt.Sprintf("%v.mp3", slug.Make(video.name)))
 	// TODO: Think if it's possible (it is possible) to tune a command.
 	cmd := exec.Command(
 		"ffmpeg",

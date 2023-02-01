@@ -16,7 +16,7 @@ var destination string
 var rootCmd = &cobra.Command{
 	Use:       "yt2mp3",
 	Short:     "Command line tool for converting YouTube videos to mp3 files.",
-	Long:      `Command line tool for converting YouTube videos to mp3 files. Created for educational purposes only.`,
+	Long:      "Command line tool for converting YouTube videos to mp3 files. Created for educational purposes only.",
 	Args:      cobra.OnlyValidArgs,
 	ValidArgs: []string{"names", "links", "yt2mp3"},
 	Run: func(cmd *cobra.Command, args []string) {
@@ -52,10 +52,10 @@ var rootCmd = &cobra.Command{
 
 func handleLinks(cmd *cobra.Command, links []string) []error {
 	// Validate links. If at least one link is not valid we stop an execution.
-	//errs := video.ValidateLinks(links)
-	//if len(errs) > 0 {
-	//	return errs
-	//}
+	errs := video.ValidateLinks(links)
+	if len(errs) > 0 {
+		return errs
+	}
 
 	// Get playback stream URLs.
 	var videos []*video.Video
@@ -111,9 +111,10 @@ func handleLinks(cmd *cobra.Command, links []string) []error {
 	}(videos)
 
 	// Run ffmpeg and convert videos to mp3 files.
+	dstDir, _ := cmd.Flags().GetString("dst")
 	channelConvertVideoToAudio := make(chan video.ChannelMessage, len(videos))
 	for _, _video := range videos {
-		go video.ConvertVideoToAudio(_video, channelConvertVideoToAudio)
+		go video.ConvertVideoToAudio(_video, dstDir, channelConvertVideoToAudio)
 	}
 	for i := 0; i < len(videos); i++ {
 		msg := <-channelConvertVideoToAudio
@@ -140,7 +141,17 @@ func Execute() {
 
 func init() {
 	// Define flags.
-	rootCmd.Flags().StringSliceVarP(&names, "names", "n", []string{}, "")
-	rootCmd.Flags().StringSliceVarP(&links, "links", "l", []string{}, "")
-	rootCmd.Flags().StringP("dest", "d", "", "")
+	rootCmd.Flags().StringSliceVarP(
+		&names, "names", "n", []string{},
+		"List of names which will be used to search for videos.",
+	)
+	rootCmd.Flags().StringSliceVarP(
+		&links, "links", "l", []string{},
+		"List of direct YouTube video links.",
+	)
+	workingDir, _ := os.Getwd()
+	rootCmd.Flags().StringP(
+		"dst", "d", workingDir,
+		"Output directory for mp3 files.",
+	)
 }
