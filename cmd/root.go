@@ -39,6 +39,16 @@ var rootCmd = &cobra.Command{
 	},
 }
 
+// handleLinks makes next magic:
+// - Validates incoming links.
+// - Gets playback streams:
+//   - If video is not well-protected get stream url using regex.
+//   - If video is well-protected get stream url using python port of youtube-dl.
+//
+// - Fetches metadata for video.
+// - Downloads videos and saves them in temp files.
+// - ffmpeg magic.
+// - Cleans up tmp files.
 func handleLinks(cmd *cobra.Command, links []string) []error {
 	// Validate links. If at least one link is not valid we stop an execution.
 	errs := video.ValidateLinks(links)

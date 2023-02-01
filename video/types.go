@@ -5,7 +5,7 @@ import (
 	"os"
 )
 
-// ChannelMessage used to communicate between a main thread and goroutines.
+// ChannelMessage used to exchange between a main thread and goroutines.
 type ChannelMessage struct {
 	Result *Video
 	Err    error
@@ -19,6 +19,7 @@ func (msg ChannelMessage) String() string {
 	return fmt.Sprintf("Result: %#v", msg.Result)
 }
 
+// ErrorBadLink link is not valid.
 type ErrorBadLink struct {
 	link    string
 	message string
@@ -28,6 +29,7 @@ func (e *ErrorBadLink) Error() string {
 	return fmt.Sprintf("Link %q %v", e.link, e.message)
 }
 
+// ErrorFetchPlaybackURL video stream URL can't be fetched/found.
 type ErrorFetchPlaybackURL struct {
 	link    string
 	message string
@@ -37,6 +39,7 @@ func (e *ErrorFetchPlaybackURL) Error() string {
 	return fmt.Sprintf("Failed to get a stream URL for the link %q reason: %q", e.link, e.message)
 }
 
+// Video internal video object.
 type Video struct {
 	url           string
 	streamUrl     string

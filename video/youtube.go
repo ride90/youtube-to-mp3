@@ -25,7 +25,7 @@ const prefixLong string = "https://www.youtube.com/"
 const prefixShort string = "https://youtu.be/"
 const progressBarWidth int = 40
 
-// ValidateLinks Ensures:
+// ValidateLinks ensures:
 //   - links are valid parseable URLs
 //   - links are YouTube links
 func ValidateLinks(links []string) []error {
@@ -75,6 +75,9 @@ func ValidateLinks(links []string) []error {
 	return _errors
 }
 
+// FetchPlaybackURL gets playback stream:
+// - If video is not well-protected get stream url using regex.
+// - If video is well-protected get stream url using python port of youtube-dl.
 func FetchPlaybackURL(link string, results chan<- ChannelMessage) {
 	var video Video
 
@@ -161,8 +164,8 @@ func FetchPlaybackURL(link string, results chan<- ChannelMessage) {
 		//  - Use itag to classify streams by their properties.
 		//  - Choose a stream and download it in segments.(see another further in the code).
 		//  To handle this case youtube-dl lib will be used (see further in the code).
-		// TODO: Rework they way JSON is handled here. Try to use structures with fallbacks.
-		// 	Idea is to avoid this ygly `has key` checks and rather fallback to defaults.
+		// TODO: Rework they way JSON is handled here. It's horrible code atm.
+		// 	Try to use structures with fallbacks. Idea is to avoid these ugly `has key` checks.
 		if playerResponseData["streamingData"] == nil {
 			results <- ChannelMessage{
 				Err:  errors.New(fmt.Sprintf("Not expected response data for the link %v. Check if link leads to a youtube video.", video.url)),
@@ -241,6 +244,7 @@ func FetchPlaybackURL(link string, results chan<- ChannelMessage) {
 	}
 }
 
+// FetchMetadata fetches metadata for video using python port of youtube-dl.
 func FetchMetadata(video *Video, results chan<- ChannelMessage) {
 	// Get bar with steps.
 	var steps = []string{"getting metadata..", "got metadata!"}
@@ -269,6 +273,7 @@ func FetchMetadata(video *Video, results chan<- ChannelMessage) {
 	results <- ChannelMessage{Result: video}
 }
 
+// FetchVideo downloads video and saves it in a temp file.
 func FetchVideo(video *Video, results chan<- ChannelMessage) {
 	// Create tmp file.
 	file, err := os.CreateTemp("", "yt2mp3_*")

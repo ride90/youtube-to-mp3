@@ -11,6 +11,7 @@ import (
 	"github.com/gosuri/uiprogress"
 )
 
+// ConvertVideoToAudio converts video to mp3 and saves in dstDir.
 func ConvertVideoToAudio(video *Video, dstDir string, results chan<- ChannelMessage) {
 	// Get bar with steps.
 	var steps = []string{"Converting to audio", "DONE!"}
