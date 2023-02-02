@@ -1,7 +1,7 @@
 # YouTube to mp3
 Command line tool for converting YouTube videos to mp3 files.
 
-:green_book: Created for educational purposes only.
+:green_book: Created for educational purposes only (my 1st Go program).
 
 ## Usage
 
