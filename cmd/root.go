@@ -138,7 +138,7 @@ func init() {
 	// Define flags.
 	rootCmd.Flags().StringSliceVarP(
 		&links, "links", "l", []string{},
-		"List of direct YouTube video links.",
+		"List of YouTube video links which will be converted to mp3 and saved on your local.",
 	)
 	rootCmd.MarkFlagRequired("links")
 	workingDir, _ := os.Getwd()
