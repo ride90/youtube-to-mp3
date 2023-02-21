@@ -14,10 +14,10 @@ Run `yt2mp3 --help` for help info.
 
 ## Installation
 
-### Get binary
+### 1. Get binary
 You can get compiled binary or compile it by yourself.
 
-#### 1. Get compiled binary
+#### Get compiled binary
 ```shell
 # Darwin amd64.
 curl -L https://github.com/ride90/youtube-to-mp3/releases/download/v0.1/darwin_amd64_yt2mp3 -o yt2mp3
@@ -48,7 +48,7 @@ You might want to add `yt2mp3` to your `PATH` or `alias` it in your `.bashrc`/`.
 alias yt2mp3="/Path/to/binary/yt2mp3"
 ```
 
-#### 2. Install FFmpeg
+### 2. Install FFmpeg
 
 Official docs [https://ffmpeg.org/download.html](https://ffmpeg.org/download.html) (don't be scary).
 Verify installation with `ffmpeg` command in your terminal emulator.
